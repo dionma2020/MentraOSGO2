@@ -1,12 +1,14 @@
 import {useEffect, useState} from "react"
 import {ScrollView, View, TextInput, TouchableOpacity, Alert} from "react-native"
-import AsyncStorage from "@react-native-async-storage/async-storage"
+import {MMKV} from "react-native-mmkv"
 import {Header, Screen, Text} from "@/components/ignite"
 import {useAppTheme} from "@/contexts/ThemeContext"
 import {useNavigationStore} from "@/stores/navigation"
 import CoreModule from "@mentra/bluetooth-sdk"
 
 const STORAGE_KEY = "teleprompter_scripts"
+
+const storage = new MMKV({id: "teleprompter"})
 
 interface TeleprompterScript {
   id: string
@@ -17,6 +19,20 @@ interface TeleprompterScript {
 
 function makeId() {
   return `script_${Date.now()}_${Math.floor(Math.random() * 1e6)}`
+}
+
+function loadScriptsFromStorage(): TeleprompterScript[] {
+  try {
+    const raw = storage.getString(STORAGE_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch (e) {
+    console.error("Failed to parse teleprompter scripts", e)
+    return []
+  }
+}
+
+function saveScriptsToStorage(scripts: TeleprompterScript[]) {
+  storage.set(STORAGE_KEY, JSON.stringify(scripts))
 }
 
 export default function TeleprompterScreen() {
@@ -30,22 +46,13 @@ export default function TeleprompterScreen() {
   const [sending, setSending] = useState(false)
 
   useEffect(() => {
-    loadScripts()
+    setScripts(loadScriptsFromStorage().sort((a, b) => b.updatedAt - a.updatedAt))
   }, [])
 
-  async function loadScripts() {
-    try {
-      const raw = await AsyncStorage.getItem(STORAGE_KEY)
-      const parsed: TeleprompterScript[] = raw ? JSON.parse(raw) : []
-      setScripts(parsed.sort((a, b) => b.updatedAt - a.updatedAt))
-    } catch (e) {
-      console.error("Failed to load teleprompter scripts", e)
-    }
-  }
-
-  async function saveScripts(next: TeleprompterScript[]) {
-    setScripts(next.sort((a, b) => b.updatedAt - a.updatedAt))
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+  function saveScripts(next: TeleprompterScript[]) {
+    const sorted = [...next].sort((a, b) => b.updatedAt - a.updatedAt)
+    setScripts(sorted)
+    saveScriptsToStorage(sorted)
   }
 
   function startNew() {
@@ -60,7 +67,7 @@ export default function TeleprompterScreen() {
     setBody(script.body)
   }
 
-  async function saveCurrent() {
+  function saveCurrent(): string {
     const trimmedTitle = title.trim() || "Untitled script"
     const id = activeId ?? makeId()
     const existingIndex = scripts.findIndex(s => s.id === id)
@@ -76,13 +83,14 @@ export default function TeleprompterScreen() {
     } else {
       next.push(updated)
     }
-    await saveScripts(next)
+    saveScripts(next)
     setActiveId(id)
+    return id
   }
 
-  async function deleteScript(id: string) {
+  function deleteScript(id: string) {
     const next = scripts.filter(s => s.id !== id)
-    await saveScripts(next)
+    saveScripts(next)
     if (activeId === id) {
       startNew()
     }
@@ -93,8 +101,7 @@ export default function TeleprompterScreen() {
       Alert.alert("Empty script", "Write or load a script before sending.")
       return
     }
-    await saveCurrent()
-    const id = activeId ?? makeId()
+    const id = saveCurrent()
     const lines = body.split("\n")
     setSending(true)
     try {
