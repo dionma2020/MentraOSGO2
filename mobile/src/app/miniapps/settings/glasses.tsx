@@ -120,6 +120,15 @@ function DeviceSettings() {
             onPress={() => push("/miniapps/settings/glasses-menu")}
           />
         )}
+        {/* Teleprompter — INMO Go2 only */}
+        {defaultWearable === DeviceTypes.INMO_GO2 && glassesConnected && (
+          <RouteButton
+            icon={<Icon name="align-left" size={24} color={theme.colors.secondary_foreground} />}
+            label="Teleprompter"
+            subtitle="Write scripts and send to glasses"
+            onPress={() => push("/asg/teleprompter")}
+          />
+        )}
         {/* Brightness Settings */}
         {features?.display?.adjustBrightness && glassesConnected && (
           <BrightnessSetting
