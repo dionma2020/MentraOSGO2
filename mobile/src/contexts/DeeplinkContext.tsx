@@ -115,6 +115,15 @@ const deepLinkRoutes: DeepLinkRoute[] = [
     requiresAuth: true,
   },
 
+  {
+    pattern: "/asg/teleprompter",
+    handler: (url: string, params: Record<string, string>) => {
+      const nav = useNavigationStore.getState()
+      nav.push("/asg/teleprompter")
+    },
+    requiresAuth: true,
+  },
+  
   // Pairing routes
   {
     pattern: "/pairing",
